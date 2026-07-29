@@ -1,0 +1,8 @@
+.vscode
+.venv
+__pycache__/
+*.so
+*.o
+build/
+bin/
+.DS_Store
