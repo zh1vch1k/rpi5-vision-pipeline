@@ -1,6 +1,8 @@
 import cv2 as cv
 import numpy as np
+import model
 
+onnx_model = model.get_model()
 video = cv.VideoCapture(0)
 
 prev_frame_features = {
@@ -10,13 +12,15 @@ prev_frame_features = {
 
 nextPts, status, err = None, None, None
 
-bg_sub = cv.createBackgroundSubtractorMOG2(history=300, varThreshold=50, detectShadows=False)
+bg_sub = cv.createBackgroundSubtractorMOG2(history=60,
+                                           varThreshold=50,
+                                           detectShadows=False)
 
 while True:
     ret, frame = video.read()
     if not ret:
         break
-    frame = cv.resize(frame, (640, 640), interpolation=cv.INTER_LINEAR);
+
     frame_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
 
     blurred = cv.bilateralFilter(frame_gray, 11, 17, 17)
@@ -24,7 +28,7 @@ while True:
 
     _, bg_mask = cv.threshold(bg_mask, 200, 255, cv.THRESH_BINARY)
 
-    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (5, 5))
+    kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (7, 7))
     mc_mask = cv.morphologyEx(bg_mask, cv.MORPH_CLOSE, kernel)
     m_mask = cv.morphologyEx(mc_mask, cv.MORPH_OPEN, kernel)
 
@@ -37,10 +41,38 @@ while True:
             cv.drawContours(motion_roi_mask, [cnt], -1, 255, -1)
             has_motion = True
 
+    if not has_motion:
+        if hasattr(onnx_model, 'predictor') and onnx_model.predictor is not None:
+            if hasattr(onnx_model.predictor, 'trackers'):
+                for t in onnx_model.predictor.trackers:
+                    if hasattr(t, 'reset'):
+                        t.reset()
+
+                delattr(onnx_model.predictor, 'trackers')
+
+    if has_motion:
+        results = onnx_model.track(frame,
+                                   tracker="botsort.yaml",
+                                   persist=True,
+                                   retina_masks=False,
+                                   conf=0.7)
+
+        for r in results:
+            if r.boxes and r.boxes.id is not None:
+                boxes = r.boxes.xyxy.cpu().numpy()
+                track_ids = r.boxes.id.int().cpu().numpy()
+                cls = r.boxes.cls.int().cpu().numpy()
+
+                for box, track_id, cl in zip(boxes, track_ids, cls):
+                    x1, y1, x2, y2 = map(int, box)
+                    cv.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                    cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
+                               cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
     if prev_frame_features['past_frame'] is None:
         prev_frame_features['past_frame'] = frame_gray
         if has_motion:
+
             prev_frame_features['features'] = cv.goodFeaturesToTrack(
                 frame_gray, 100, 0.01, 10, mask=motion_roi_mask
             )
@@ -93,8 +125,8 @@ while True:
 
         elif has_motion:
             prev_frame_features['features'] = cv.goodFeaturesToTrack(
-                frame_gray, 100, 0.01, 10, mask=motion_roi_mask
-        )
+                frame_gray, 100, 0.01, 10, mask=motion_roi_mask)
+
 
         prev_frame_features['past_frame'] = frame_gray
 
