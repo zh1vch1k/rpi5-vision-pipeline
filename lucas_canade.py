@@ -16,7 +16,7 @@ while True:
     ret, frame = video.read()
     if not ret:
         break
-
+    frame = cv.resize(frame, (640, 640), interpolation=cv.INTER_LINEAR);
     frame_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
 
     blurred = cv.bilateralFilter(frame_gray, 11, 17, 17)
