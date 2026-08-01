@@ -7,7 +7,7 @@ BUFFER_PATH: str = 'rpi5_pipeline'
 SEM_NAME : str = '/rpi5_semaphore'
 
 #3 channels for image 640*640 in bytes + 32 bits of metadata
-FRAME_SIZE = 640 * 640 * 3  
+FRAME_SIZE = 640 * 360 * 3  
 HEADER_SIZE = 32            
 TOTAL_BYTES = HEADER_SIZE + FRAME_SIZE
 

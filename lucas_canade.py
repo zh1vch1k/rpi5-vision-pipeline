@@ -5,6 +5,9 @@ import model
 onnx_model = model.get_model()
 video = cv.VideoCapture(0)
 
+video.set(cv.CAP_PROP_FRAME_WIDTH, 640)
+video.set(cv.CAP_PROP_FRAME_HEIGHT, 360)
+
 prev_frame_features = {
     'past_frame': None,
     'features': None
