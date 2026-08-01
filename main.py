@@ -12,10 +12,13 @@ if __name__ == '__main__':
             mem_writer(frame_id, time.time_ns())
             frame_id += 1
             
-            cv.imshow('YOLO + Flow', frame)
+            cv.imshow('YOLO + Flow.', frame)
 
             if cv.waitKey(1) & 0xFF == ord('q'):
                 print("Closing program...")
                 break
+
+    except KeyboardInterrupt:
+        pass
     finally:
         mem_writer.cleanup()
