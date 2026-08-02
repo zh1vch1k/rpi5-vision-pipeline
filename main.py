@@ -9,7 +9,7 @@ if __name__ == '__main__':
 
     try:
         for frame in lucas_canade.frame_process():
-            mem_writer(frame_id, time.time_ns())
+            mem_writer.write_frame(frame_id, time.time_ns(), frame)
             frame_id += 1
             
             cv.imshow('YOLO + Flow.', frame)

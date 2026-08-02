@@ -26,7 +26,7 @@ def frame_process():
             ret, frame = video.read()
             if not ret:
                 break
-
+            frame = cv.resize(frame, (640, 360), interpolation=cv.INTER_CUBIC)
             frame_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
 
             blurred = cv.bilateralFilter(frame_gray, 11, 17, 17)
@@ -62,7 +62,8 @@ def frame_process():
                                         tracker="botsort.yaml",
                                         persist=True,
                                         retina_masks=False,
-                                        conf=0.7)
+                                        conf=0.7,
+                                        verbose=False)
 
                 for r in results:
                     if r.boxes and r.boxes.id is not None:
