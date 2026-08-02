@@ -44,5 +44,6 @@ ShmReader::~ShmReader() {
 
     if (sem && sem != SEM_FAILED) {
         sem_close(this->sem);
+        sem=nullptr;
     }
 }

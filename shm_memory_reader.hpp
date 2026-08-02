@@ -12,7 +12,7 @@
 
 class ShmReader { 
 private: 
-    inline static constexpr const char* BUFFER_PATH = "rpi5_pipeline";
+    inline static constexpr const char* BUFFER_PATH = "/rpi5_pipeline";
     inline static constexpr const char* SEM_NAME = "/rpi5_semaphore";
     inline static constexpr size_t TOTAL_BYTES = sizeof(FrameMetadata) + (640 * 360 * 3);
 
