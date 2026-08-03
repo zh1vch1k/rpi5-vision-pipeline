@@ -13,7 +13,8 @@ def get_context(config_filename: str = "config.json") -> dict:
                     'IPV4':           config['network']['ip'],
                     'PORT':           config['network']['port'],
                     'BUFFER_PATH':    config['ipc']['buffer_path'],
-                    'SEMAPHORE_NAME': config['ipc']['semaphore_name']
+                    'SEMAPHORE_NAME': config['ipc']['semaphore_name'],
+                    'FPS':            config['video']['fps']
                 }
 
 

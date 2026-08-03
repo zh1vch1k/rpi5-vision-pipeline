@@ -1,7 +1,10 @@
 import cv2 as cv
 import numpy as np
 import model
+import time
 import config_parser as config
+from collections import deque
+
 
 ctx = config.get_context('config.json')
 FRAME_WIDTH = ctx['FRAME_WIDTH']
@@ -9,8 +12,9 @@ FRAME_HEIGHT = ctx['FRAME_HEIGHT']
 
 onnx_model = model.get_model()
 
-def frame_process(): 
+fps_deque = deque(maxlen=100) 
 
+def frame_process(): 
     video = cv.VideoCapture(0)
 
     video.set(cv.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
@@ -28,6 +32,7 @@ def frame_process():
                                             detectShadows=False)
     try: 
         while True:
+            start = time.time()
             ret, frame = video.read()
             if not ret:
                 break
@@ -158,6 +163,20 @@ def frame_process():
                 cv.imshow('Motion Flow Tracking', frame)
             else:
                 cv.putText(frame, 'No motion found', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+
+            fps = 1 / (time.time() - start)
+            fps_deque.append(fps)
+
+            if len(fps_deque) > 1:
+                y_labels = np.array(fps_deque)
+                x_points = np.arange(len(fps_deque))
+                baseline_y = FRAME_HEIGHT - 20
+
+                y_coords = baseline_y - (y_labels) 
+                points = np.column_stack((x_points, y_coords)).astype(np.int32).reshape(-1, 1, 2)
+                cv.polylines(frame, [points], isClosed=False, color=(0, 255, 255), thickness=1)
+
+                cv.putText(frame, f'FPS: {int(fps_deque[-1])}', (10, 60), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 1)
             yield frame
 
     finally:
