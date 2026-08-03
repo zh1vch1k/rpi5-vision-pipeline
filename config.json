@@ -1,11 +1,12 @@
 {
   "network": {
-    "ip": "127.0.0.1",
+    "ip": "192.168.1.118",
     "port": "1221"
   },
   "video": {
     "width": 640,
     "height": 360,
+    "channels": 3,
     "fps": 60
   },
   "ipc": {

@@ -14,6 +14,7 @@ namespace config {
     struct VideoConfig {
         int width;
         int height;
+        int channels;
         int fps;
         };
         
@@ -29,7 +30,7 @@ namespace config {
     };
 
 
-    Config getContext(const char* filename) {
+    inline Config getContext(const char* filename) {
         std::ifstream config(filename);
         if (!config.is_open()) {
             std::cerr << "[Config] Failed to open config file: " << filename << "\n"; 
@@ -45,7 +46,7 @@ namespace config {
         auto ipc     = ctx["ipc"].get<StringDict>();
 
         NetworkConfig network_struct = NetworkConfig {network["ip"], network["port"]};
-        VideoConfig video_struct = VideoConfig {video["width"], video["height"], video["fps"]};
+        VideoConfig video_struct = VideoConfig {video["width"], video["height"], video["channels"], video["fps"]};
         IPC ipc_struct = IPC {ipc["buffer_path"], ipc["semaphore_name"]};
         
         return Config {network_struct, video_struct, ipc_struct};

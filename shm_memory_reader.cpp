@@ -1,6 +1,10 @@
 #include "shm_memory_reader.hpp"
 
 int ShmReader::init() {
+    BUFFER_PATH = ctx.ipc.bufferName.c_str();
+    SEM_NAME = ctx.ipc.semaphoreName.c_str();
+    TOTAL_BYTES = sizeof(FrameMetadata) + (ctx.video.width * ctx.video.height * ctx.video.channels);
+
     int fd = shm_open(BUFFER_PATH, O_RDONLY, 0666);
     if (fd == -1) {
         std::cerr << "[C++] Error: shm_open hasn't found the path '" << BUFFER_PATH << "'!" << std::endl;

@@ -48,7 +48,6 @@ public:
         av_frame_free(&rawFrame);
 
         avcodec_free_context(&codecContext);
-        avformat_free_context(formatContext);
 
         sws_freeContext(swsContext);
 
@@ -57,6 +56,12 @@ public:
         if (formatContext && !(formatContext->oformat->flags & AVFMT_NOFILE)) {
             avio_closep(&formatContext->pb);
         }
+
+        if (formatContext) {
+            avformat_free_context(formatContext);
+            formatContext = nullptr;
+        }
+        
     }
 };
 

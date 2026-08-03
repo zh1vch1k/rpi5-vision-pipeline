@@ -1,7 +1,12 @@
 #include "ffmpeg_streamer.hpp"
+#include "config.hpp"
+
+config::Config ctx = config::getContext("config.json");
+
+const std::string udp_path_str = "udp://" + ctx.network.ip + ":" + ctx.network.port;
 
 int FfmpegStreamer::initFormatContext() {
-    int status = avformat_alloc_output_context2(&formatContext, nullptr, "mpegts", "udp://192.168.1.118:1221");
+    int status = avformat_alloc_output_context2(&formatContext, nullptr, "mpegts", udp_path_str.c_str());
     if (status < 0) {
         return status;
     }
@@ -22,12 +27,12 @@ int FfmpegStreamer::initCodecContext() {
 
     codecContext = avcodec_alloc_context3(codec);
 
-    codecContext->width = 640;
-    codecContext->height = 360;
+    codecContext->width = ctx.video.width;
+    codecContext->height = ctx.video.height;
     codecContext->pix_fmt = AV_PIX_FMT_YUV420P;
-    codecContext->time_base = {1, 60}; 
+    codecContext->time_base = {1, ctx.video.fps}; 
     codecContext->max_b_frames = 0;   
-    codecContext->gop_size = 30; 
+    codecContext->gop_size = 15; 
 
     codecContext->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
     
@@ -39,14 +44,14 @@ int FfmpegStreamer::initCodecContext() {
 
 
 int FfmpegStreamer::initSwsContext() {
-    swsContext = sws_getContext(640, 360, AV_PIX_FMT_BGR24, 
-                                640, 360, AV_PIX_FMT_YUV420P, 
+    swsContext = sws_getContext(ctx.video.width, ctx.video.height, AV_PIX_FMT_BGR24, 
+                                ctx.video.width, ctx.video.height, AV_PIX_FMT_YUV420P, 
                                 SWS_FAST_BILINEAR, 
                                 nullptr, nullptr, nullptr);
 
     yuvFrame->format = AV_PIX_FMT_YUV420P;
-    yuvFrame->width  = 640;
-    yuvFrame->height = 360;
+    yuvFrame->width  = ctx.video.width;
+    yuvFrame->height = ctx.video.height;
 
     av_frame_get_buffer(yuvFrame, 0);
     return 0;
@@ -86,7 +91,6 @@ int FfmpegStreamer::sendFrame(const cv::Mat& wrapper) {
         av_packet_rescale_ts(encodedFrame, codecContext->time_base, formatContext->streams[0]->time_base);
         encodedFrame->stream_index = 0;
 
-        // Отправляем пакет в сокет
         av_interleaved_write_frame(formatContext, encodedFrame);
         av_packet_unref(encodedFrame);
     }
