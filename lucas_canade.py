@@ -78,9 +78,15 @@ def frame_process():
 
                         for box, track_id, cl in zip(boxes, track_ids, cls):
                             x1, y1, x2, y2 = map(int, box)
-                            cv.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                            cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
-                                    cv.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                            if (cl == 0): 
+                                cv.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                                cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
+                                        cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                            else: 
+                                cv.rectangle(frame, (x1, y1), (x2, y2), (127, 127, 127), 2)
+                                cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
+                                    cv.FONT_HERSHEY_SIMPLEX, 0.5, (127, 127, 127), 2)
+                            
 
             if prev_frame_features['past_frame'] is None:
                 prev_frame_features['past_frame'] = frame_gray
