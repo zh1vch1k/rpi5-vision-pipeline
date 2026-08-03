@@ -1,6 +1,11 @@
 import cv2 as cv
 import numpy as np
 import model
+import config_parser as config
+
+ctx = config.get_context('config.json')
+FRAME_WIDTH = ctx['FRAME_WIDTH']
+FRAME_HEIGHT = ctx['FRAME_HEIGHT']
 
 onnx_model = model.get_model()
 
@@ -8,8 +13,8 @@ def frame_process():
 
     video = cv.VideoCapture(0)
 
-    video.set(cv.CAP_PROP_FRAME_WIDTH, 640)
-    video.set(cv.CAP_PROP_FRAME_HEIGHT, 360)
+    video.set(cv.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+    video.set(cv.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
 
     prev_frame_features = {
         'past_frame': None,
@@ -26,7 +31,7 @@ def frame_process():
             ret, frame = video.read()
             if not ret:
                 break
-            frame = cv.resize(frame, (640, 360), interpolation=cv.INTER_CUBIC)
+            frame = cv.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv.INTER_CUBIC)
             frame_gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
 
             blurred = cv.bilateralFilter(frame_gray, 11, 17, 17)

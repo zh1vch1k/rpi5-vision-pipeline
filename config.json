@@ -1,0 +1,15 @@
+{
+  "network": {
+    "ip": "127.0.0.1",
+    "port": "1221"
+  },
+  "video": {
+    "width": 640,
+    "height": 360,
+    "fps": 60
+  },
+  "ipc": {
+    "buffer_path": "/rpi5_pipeline",
+    "semaphore_name": "/rpi5_semaphore"
+  }
+}

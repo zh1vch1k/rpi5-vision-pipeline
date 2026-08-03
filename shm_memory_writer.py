@@ -2,9 +2,12 @@ import struct
 import numpy as np
 import posix_ipc
 from multiprocessing.shared_memory import SharedMemory
+import config_parser as config
 
-BUFFER_PATH: str = 'rpi5_pipeline'
-SEM_NAME : str = '/rpi5_semaphore'
+ctx = config.get_context('config.json')
+
+BUFFER_PATH: str = ctx['BUFFER_PATH'].lstrip('/')
+SEM_NAME : str = ctx['SEMAPHORE_NAME']
 
 #3 channels for image 640*360 in bytes + 32 bits of metadata
 FRAME_SIZE = 640 * 360 * 3  
