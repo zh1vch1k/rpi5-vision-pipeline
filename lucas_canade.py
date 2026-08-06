@@ -1,10 +1,10 @@
+import queue
 import cv2 as cv
 import numpy as np
 import model
 import time
 import config_parser as config
 from collections import deque
-
 
 ctx = config.get_context('config.json')
 FRAME_WIDTH = ctx['FRAME_WIDTH']
@@ -13,10 +13,53 @@ FRAME_HEIGHT = ctx['FRAME_HEIGHT']
 onnx_model = model.get_model()
 
 fps_deque = deque(maxlen=100) 
+inference_deque = deque(maxlen=100) #for YOLO pre/postprocrssing and inference summary time
 
-def frame_process(): 
+
+def inference(in_queue:queue.Queue, out_queue:queue.Queue): 
+    while True:
+        frame = in_queue.get()
+
+        if frame is None: 
+            break
+        result = onnx_model.track(frame, 
+                                  tracker="botsort.yaml",
+                                  persist=True,
+                                  retina_masks=False,
+                                  conf=0.7,
+                                   verbose=False)
+        out_queue.put(result)
+
+        if hasattr(onnx_model, 'predictor') and onnx_model.predictor is not None:
+            if hasattr(onnx_model.predictor, 'trackers'):
+                for t in onnx_model.predictor.trackers:
+                    if hasattr(t, 'reset'):
+                        t.reset()
+
+
+def draw_bbox(frame, results):
+    for r in results: 
+        if r.boxes and r.boxes.id is not None:
+            boxes = r.boxes.xyxy.cpu().numpy()
+            track_ids = r.boxes.id.int().cpu().numpy()
+            cls = r.boxes.cls.int().cpu().numpy()
+                            
+            for box, track_id, cl in zip(boxes, track_ids, cls):
+                x1, y1, x2, y2 = map(int, box)
+                if (cl == 0): 
+                    cv.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                    cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
+                    cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                else: 
+                    cv.rectangle(frame, (x1, y1), (x2, y2), (127, 127, 127), 2)
+                    cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
+                    cv.FONT_HERSHEY_SIMPLEX, 0.5, (127, 127, 127), 2)
+    return frame
+
+
+def frame_process(in_queue:queue.Queue, out_queue:queue.Queue): 
     video = cv.VideoCapture(0)
-
+    video.set(cv.CAP_PROP_BUFFERSIZE, 1)
     video.set(cv.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
     video.set(cv.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
 
@@ -58,40 +101,17 @@ def frame_process():
                     cv.drawContours(motion_roi_mask, [cnt], -1, 255, -1)
                     has_motion = True
 
-            if not has_motion:
-                if hasattr(onnx_model, 'predictor') and onnx_model.predictor is not None:
-                    if hasattr(onnx_model.predictor, 'trackers'):
-                        for t in onnx_model.predictor.trackers:
-                            if hasattr(t, 'reset'):
-                                t.reset()
-
-                        delattr(onnx_model.predictor, 'trackers')
-
             if has_motion:
-                results = onnx_model.track(frame,
-                                        tracker="botsort.yaml",
-                                        persist=True,
-                                        retina_masks=False,
-                                        conf=0.7,
-                                        verbose=False)
+                try:
+                    in_queue.put_nowait(frame)
+                except queue.Full: 
+                    continue               
 
-                for r in results:
-                    if r.boxes and r.boxes.id is not None:
-                        boxes = r.boxes.xyxy.cpu().numpy()
-                        track_ids = r.boxes.id.int().cpu().numpy()
-                        cls = r.boxes.cls.int().cpu().numpy()
-
-                        for box, track_id, cl in zip(boxes, track_ids, cls):
-                            x1, y1, x2, y2 = map(int, box)
-                            if (cl == 0): 
-                                cv.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                                cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
-                                        cv.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                            else: 
-                                cv.rectangle(frame, (x1, y1), (x2, y2), (127, 127, 127), 2)
-                                cv.putText(frame, f"ID: {track_id} Cls: {cl}", (x1, y1 - 10),
-                                    cv.FONT_HERSHEY_SIMPLEX, 0.5, (127, 127, 127), 2)
-                            
+                try: 
+                    results = out_queue.get_nowait()
+                    draw_bbox(frame, results)
+                except queue.Empty : 
+                    continue                     
 
             if prev_frame_features['past_frame'] is None:
                 prev_frame_features['past_frame'] = frame_gray
@@ -159,8 +179,6 @@ def frame_process():
                 pts = prev_frame_features['features'].reshape(-1, 2)
                 for x, y in pts:
                     cv.circle(frame, (int(x), int(y)), 4, (0, 255, 0), -1)
-
-                cv.imshow('Motion Flow Tracking', frame)
             else:
                 cv.putText(frame, 'No motion found', (10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
