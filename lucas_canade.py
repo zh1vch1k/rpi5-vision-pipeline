@@ -57,6 +57,29 @@ def draw_bbox(frame, results):
     return frame
 
 
+def optical_flow_shift(prev_pts, new_pts, status=None):
+    if prev_pts is None or new_pts is None or len(prev_pts) == 0 or len(new_pts) == 0:
+        return None
+
+    prev_pts = np.array(prev_pts).reshape(-1, 2)
+    new_pts = np.array(new_pts).reshape(-1, 2)
+
+    if status is not None: 
+        valid_mask = (status.ravel() == 1)
+        prev_pts = prev_pts[valid_mask]
+        new_pts = new_pts[valid_mask]
+
+    if len(prev_pts) == 0 or len(new_pts) == 0:
+        return None
+
+    deltas = new_pts - prev_pts
+
+    delta_x = float(np.median(deltas[:, 0]))
+    delta_y = float(np.median(deltas[:, 1]))
+
+    return (delta_x, delta_y)
+
+
 def frame_process(in_queue:queue.Queue, out_queue:queue.Queue): 
     video = cv.VideoCapture(0)
     video.set(cv.CAP_PROP_BUFFERSIZE, 1)
