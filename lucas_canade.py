@@ -5,6 +5,7 @@ import model
 import time
 import config_parser as config
 from collections import deque
+import itertools as it
 
 ctx = config.get_context('config.json')
 FRAME_WIDTH = ctx['FRAME_WIDTH']
@@ -14,6 +15,22 @@ onnx_model = model.get_model()
 
 fps_deque = deque(maxlen=100) 
 inference_deque = deque(maxlen=100) #for YOLO pre/postprocrssing and inference summary time
+
+
+def compute_iou(boxA, boxB):
+    xA = max(boxA[0], boxB[0])
+    yA = max(boxA[1], boxB[1])
+    xB = min(boxA[2], boxB[2])
+    yB = min(boxA[3], boxB[3])
+
+    intersect= max(0, xB-xA) * max(0, yB-yA)
+    if intersect == 0:
+        return 0.0
+
+    total_a = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1])
+    total_b = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1])
+
+    return intersect / float(min(total_a, total_b))
 
 
 def inference(in_queue:queue.Queue, out_queue:queue.Queue): 
@@ -80,6 +97,18 @@ def optical_flow_shift(prev_pts, new_pts, status=None):
     return (delta_x, delta_y)
 
 
+def extract_bboxes_from_results(results):
+    boxes_list = []
+    if results is None:
+        return boxes_list
+    for r in results:
+        if r.boxes and len(r.boxes) > 0:
+            boxes = r.boxes.xyxy.cpu().numpy()
+            for b in boxes:
+                boxes_list.append(b) 
+    return boxes_list
+
+
 def frame_process(in_queue:queue.Queue, out_queue:queue.Queue): 
     video = cv.VideoCapture(0)
     video.set(cv.CAP_PROP_BUFFERSIZE, 1)
@@ -92,12 +121,15 @@ def frame_process(in_queue:queue.Queue, out_queue:queue.Queue):
     }
 
     nextPts, status, err = None, None, None
+    inference_results = []
+    last_yolo_time = 0.0  # Таймер для кулдауна инференса (в секундах)
 
     bg_sub = cv.createBackgroundSubtractorMOG2(history=60,
                                             varThreshold=50,
                                             detectShadows=False)
     try: 
         while True:
+            mog_bbox = []
             start = time.time()
             ret, frame = video.read()
             if not ret:
@@ -116,25 +148,41 @@ def frame_process(in_queue:queue.Queue, out_queue:queue.Queue):
 
             contours, _ = cv.findContours(m_mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
             motion_roi_mask = np.zeros_like(m_mask)
-            has_motion = False
 
-            #Denoising the mask, because MOG2 is sensible for noise
+            has_motion, need_yolo_inference = False, False
+
+            # Denoising the mask, because MOG2 is sensible for noise
             for cnt in contours:
-                if cv.contourArea(cnt) > 2000:
+                if cv.contourArea(cnt) > 1500:
+                    x, y, w, h = cv.boundingRect(cnt)
+                    mog_bbox.append([x, y, x+w, y+h])
                     cv.drawContours(motion_roi_mask, [cnt], -1, 255, -1)
                     has_motion = True
 
-            if has_motion:
+            yolo_bbox = extract_bboxes_from_results(inference_results)
+            for m_bbox in mog_bbox:
+                max_iou = max([compute_iou(m_bbox, y_box) for y_box in yolo_bbox], default=0.0)
+
+                if max_iou < 0.15:
+                    need_yolo_inference = True
+                    break
+
+            current_time = time.time()
+            cooldown_passed = (current_time - last_yolo_time) >= 1.0
+
+            if (need_yolo_inference or inference_results == []) and has_motion and cooldown_passed: 
                 try:
                     in_queue.put_nowait(frame)
+                    last_yolo_time = current_time 
+                    need_yolo_inference = False
                 except queue.Full: 
-                    continue               
+                    pass               
 
                 try: 
-                    results = out_queue.get_nowait()
-                    draw_bbox(frame, results)
-                except queue.Empty : 
-                    continue                     
+                    inference_results = out_queue.get_nowait()
+                    draw_bbox(frame, inference_results)
+                except queue.Empty: 
+                    pass                   
 
             if prev_frame_features['past_frame'] is None:
                 prev_frame_features['past_frame'] = frame_gray
@@ -194,9 +242,7 @@ def frame_process(in_queue:queue.Queue, out_queue:queue.Queue):
                     prev_frame_features['features'] = cv.goodFeaturesToTrack(
                         frame_gray, 100, 0.01, 10, mask=motion_roi_mask)
 
-
                 prev_frame_features['past_frame'] = frame_gray
-
 
             if prev_frame_features['features'] is not None and len(prev_frame_features['features']) > 0:
                 pts = prev_frame_features['features'].reshape(-1, 2)
@@ -223,6 +269,3 @@ def frame_process(in_queue:queue.Queue, out_queue:queue.Queue):
     finally:
         video.release()
         cv.destroyAllWindows()
-
-            
-
