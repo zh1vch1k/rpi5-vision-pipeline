@@ -13,7 +13,8 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 CompileCommands.json
-
+poetry.toml
+testament.py
 *.dSYM/
 
 __pycache__/

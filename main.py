@@ -1,5 +1,6 @@
 import time
-import lucas_canade
+# import lucas_canade
+import testament as te
 import cv2 as cv
 import shm_memory_writer as mem_writer
 import queue
@@ -11,13 +12,13 @@ if __name__ == '__main__':
     in_queue = queue.Queue(maxsize=1)
     out_queue = queue.Queue(maxsize=1)
 
-    inference_thread = threading.Thread(target = lucas_canade.inference, 
+    inference_thread = threading.Thread(target = te.inference, 
                                         args=(in_queue, out_queue), 
                                         daemon=True)
     inference_thread.start()
 
     try:
-        for frame in lucas_canade.frame_process(in_queue, out_queue):
+        for frame in te.frame_process(in_queue, out_queue):
             mem_writer.write_frame(frame_id, time.time_ns(), frame)
             frame_id += 1
             
